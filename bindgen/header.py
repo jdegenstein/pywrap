@@ -972,6 +972,7 @@ class HeaderInfo(object):
             tu_parsing_header=tu_parsing_header,
             platform_parsing_header=settings[current_platform(
             )]["parsing_header"],
+            target_platform = target_platform,
         )
 
         self.name = path

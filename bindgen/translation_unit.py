@@ -30,7 +30,9 @@ def parse_tu(
     args.append(f"-I{input_folder}")
 
     if target_platform == "Windows":
-        args.apppend("(--target=x86_64-pc-windows-msvc")
+        args.append("--target=x86_64-pc-windows-msvc")
+        args.append("-fms-compatibility")
+        args.append("-fms-extensions")
 
     if prefix:
         args.append(f"--sysroot={prefix}")
