@@ -1,6 +1,6 @@
 from typing import List, Tuple, Any, Mapping, Optional
 from itertools import chain
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from clang.cindex import (
     CursorKind,
@@ -526,15 +526,14 @@ class ArgInfo:
     arg_name: str
     arg_type: str
     arg_defualt: str
-    arg_py_name: str | None = None
+    arg_py_name: str = field(init=False)
 
-    def __init__(self, *args, **kwargs):
+    def __post_init__(self):
 
-        super().__init__(*args, **kwargs)
-
-        if self.arg_py_name is None:
-            if self.arg_name in ('def',):  # extend with more reserved words
-                self.arg_py_name = f'{self.arg_name}_'
+        if self.arg_name in ('def',):  # extend with more reserved words
+            self.arg_py_name = f'{self.arg_name}_'
+        else:
+            self.arg_py_name = self.arg_name
 
 
 class FunctionInfo(BaseInfo):
