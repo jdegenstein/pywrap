@@ -520,6 +520,23 @@ class EnumInfo(BaseInfo):
                 "::")[:-1])  # get rid of anonymous
 
 
+@dataclass
+class ArgInfo:
+
+    arg_name: str
+    arg_type: str
+    arg_defualt: str
+    arg_py_name: str | None = None
+
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        if self.arg_py_name is None:
+            if self.arg_name in ('def',):  # extend with more reserved words
+                self.arg_py_name = f'{self.arg_name}_'
+
+
 class FunctionInfo(BaseInfo):
     """Container for function parsing results
     """
@@ -530,7 +547,7 @@ class FunctionInfo(BaseInfo):
     return_type: str
     inline: bool
     pointer_by_ref: bool
-    args: List[Tuple[str, str, str]]
+    args: List[ArgInfo]
     default_value_types: List[str]
 
     KIND_DICT = {
@@ -560,7 +577,8 @@ class FunctionInfo(BaseInfo):
             self._pointer_by_ref(el) for el in cur.get_arguments()
         )
         self.args = [
-            (el.spelling, self._underlying_type(el, cur), self._default_value(el))
+            ArgInfo(el.spelling, self._underlying_type(
+                el, cur), self._default_value(el))
             for el in cur.get_arguments()
         ]
         self.default_value_types = [
@@ -972,7 +990,7 @@ class HeaderInfo(object):
             tu_parsing_header=tu_parsing_header,
             platform_parsing_header=settings[current_platform(
             )]["parsing_header"],
-            target_platform = target_platform,
+            target_platform=target_platform,
         )
 
         self.name = path

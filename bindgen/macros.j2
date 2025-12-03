@@ -17,7 +17,7 @@
 {%- endmacro -%}
 
 {%- macro prototype(f) -%}
-    {{f.return_type}} {{f.name}}({% for n,t,d in f.args %}{{ t }} {{ n }}{{ "," if not loop.last }}{% endfor %}){% if f.const %} const {%endif%}
+    {{f.return_type}} {{f.name}}({% for arg in f.args %}{{ arg.arg_type }} {{ arg.arg_name }}{{ "," if not loop.last }}{% endfor %}){% if f.const %} const {%endif%}
 {%- endmacro -%}
 
 {%- macro pybind_overload(c,m) -%}
@@ -26,44 +26,44 @@
 {%- endmacro -%}
 
 {%- macro argtypes(f) -%}
-    {% for _,t,_ in f.args %}{{ t }}{{ "," if not loop.last }}{% endfor %}
+    {% for arg in f.args %}{{ arg.arg_type }}{{ "," if not loop.last }}{% endfor %}
 {%- endmacro -%}
 
 {%- macro argtypes_names(f) -%}
-    {% for arg,t,_ in f.args %}{{ t }} {{ arg }}{{ "," if not loop.last }}{% endfor %}
+    {% for arg in f.args %}{{ arg.arg_type }} {{ arg.arg_name }}{{ "," if not loop.last }}{% endfor %}
 {%- endmacro -%}
 
 {%- macro argtypes_names_not_byref(f) -%}
-    {% for arg,t,_ in f.args if not is_byref(t) %}{{ type_from_byref_smart_ptr(t)+'&' if is_byref_smart_ptr(t) else t }} {{ arg }}{{ "," if not loop.last }}{% endfor %}
+    {% for arg in f.args if not is_byref(arg.arg_type) %}{{ type_from_byref_smart_ptr(arg.arg_type)+'&' if is_byref_smart_ptr(arg.arg_type) else arg.arg_type }} {{ arg.arg_name }}{{ "," if not loop.last }}{% endfor %}
 {%- endmacro -%}
 
 {%- macro init_outputs_byref(f) -%}
-    {% for arg,t,_ in f.args if is_byref(t) %}{{ t[:-1] }} {{ arg }};
+    {% for arg in f.args if is_byref(arg.arg_type) %}{{ arg.arg_type[:-1] }} {{ arg.arg_name }};
     {% endfor %}
-    {% for arg,t,_ in f.args if is_byref_smart_ptr(t) -%}
-    {{ t[:-1] }} {{ arg }}_ptr; {{ arg }}_ptr = &{{arg}};
+    {% for arg in f.args if is_byref_smart_ptr(arg.arg_type) -%}
+    {{ arg.arg_type[:-1] }} {{ arg.name }}_ptr; {{ arg.name }}_ptr = &{{arg.name}};
     {% endfor %}
 {%- endmacro -%}
 
 {%- macro argnames_wo_type(f) -%}
-    {% for arg,t,_ in f.args %}{% if is_byref_smart_ptr(t) %}{{ arg }}_ptr{% else %}{{ arg }}{% endif %}{{ "," if not loop.last }}{% endfor %}
+    {% for arg in f.args %}{% if is_byref_smart_ptr(arg.arg_type) %}{{ arg.arg_name }}_ptr{% else %}{{ arg.arg_name }}{% endif %}{{ "," if not loop.last }}{% endfor %}
 {%- endmacro -%}
 
 {%- macro argnames_byref(f) -%}
-    {% for arg,t,_ in f.args if is_byref(t) %}{{ arg }}{{ "," if not loop.last }}{% endfor %}
+    {% for arg in f.args if is_byref(arg.arg_type) %}{{ arg.arg_name }}{{ "," if not loop.last }}{% endfor %}
 {%- endmacro -%}
 
 {%- macro argnames(f) -%}
-    {% for arg,t,d in f.args %} {{ "," if loop.first }} py::arg("{{arg if arg!='' else 'arg'}}"){% if d %}=static_cast<{{t}}>({{d}}){% endif %}{{ "," if not loop.last }}{% endfor %}
+    {% for arg in f.args %} {{ "," if loop.first }} py::arg("{{arg.arg_py_name if arg.arg_py_name!='' else 'arg'}}"){% if d %}=static_cast<{{arg.arg_type}}>({{arg.arg_default}}){% endif %}{{ "," if not loop.last }}{% endfor %}
 {%- endmacro -%}
 
 {%- macro argnames_template(template, f) -%}
-    {%- for arg,t,d in f.args -%} {{ "," if loop.first }}
-    {%- set ns = namespace(t=t) -%}
+    {%- for arg in f.args -%} {{ "," if loop.first }}
+    {%- set ns = namespace(t=arg.arg_type) -%}
     {%- if t.startswith(template.name) -%}
         {% set ns.t = template.name + '<' +  template.type_params|map('get',1)|join(', ') + '>' + t.split(template.name)[-1] %}
     {%- endif -%}
-    py::arg("{{arg if arg!='' else 'arg'}}"){% if d %}=static_cast<{{arg_type_with_template_params(template, t)}}>({{d}}){% endif %}{{ ", " if not loop.last }}
+    py::arg("{{arg.arg_py_name if arg.arg_py_name != '' else 'arg'}}"){% if arg.arg_default %}=static_cast<{{arg_type_with_template_params(template, arg.arg_type)}}>({{arg.arg_default}}){% endif %}{{ ", " if not loop.last }}
     {%- endfor -%}
 {%- endmacro -%}
 
@@ -76,25 +76,25 @@
 {%- endmacro -%}
 
 {%- macro argnames_not_byref(f) -%}
-    {% for arg,t,d in f.args if not is_byref(t) %} {{ "," if loop.first }} py::arg("{{arg if arg!='' else 'arg'}}"){% if d %}=static_cast<{{t}}>({{d}}){% endif %}{{ "," if not loop.last }}{% endfor %}
+    {% for arg in f.args if not is_byref(arg.arg_type) %} {{ "," if loop.first }} py::arg("{{arg.arg_py_name if arg.arg_py_name != '' else 'arg'}}"){% if arg.arg_default %}=static_cast<{{arg.arg_type}}>({{arg.arg_default}}){% endif %}{{ "," if not loop.last }}{% endfor %}
 {%- endmacro -%}
 
 {%- macro handle_results_ptr_byref(f) -%}
-    {% for arg,t,_ in f.args if is_byref_smart_ptr(t) -%}
-    if ( {{ arg }}_ptr.get() != &{{arg}} ) copy_if_copy_constructible({{arg}}, *{{ arg }}_ptr);
+    {% for arg in f.args if is_byref_smart_ptr(arg.arg_type) -%}
+    if ( {{ arg.arg_name }}_ptr.get() != &{{arg.arg_name}} ) copy_if_copy_constructible({{arg.arg_name}}, *{{ arg.arg_name}}_ptr);
     {% endfor -%}
 {%- endmacro -%}
 
 {%- macro method_pointer(cls,f) -%}
-    ({{f.return_type}} ({{cls.name}}::*)({% for _,t,d in f.args %} {{t}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}) static_cast<{{f.return_type}} ({{cls.name}}::*)({% for _,t,_ in f.args %} {{t}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}>(&{{cls.name}}::{{f.name}})
+    ({{f.return_type}} ({{cls.name}}::*)({% for arg in f.args %} {{arg.arg_type}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}) static_cast<{{f.return_type}} ({{cls.name}}::*)({% for arg in f.args %} {{arg.arg_type}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}>(&{{cls.name}}::{{f.name}})
 {%- endmacro -%}
 
 {%- macro static_method_pointer(cls,f) -%}
-    ({{f.return_type}} (*)({% for _,t,d in f.args %} {{t}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}) static_cast<{{f.return_type}} (*)({% for _,t,_ in f.args %} {{t}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}>(&{{cls.name}}::{{f.name}})
+    ({{f.return_type}} (*)({% for arg in f.args %} {{arg.arg_type}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}) static_cast<{{f.return_type}} (*)({% for arg in f.args %} {{arg.arg_type}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}>(&{{cls.name}}::{{f.name}})
 {%- endmacro -%}
 
 {%- macro function_pointer(f) -%}
-    ({{f.return_type}} (*)({% for _,t,d in f.args %} {{t}} {{ "," if not loop.last }} {% endfor %}))  static_cast<{{f.return_type}} (*)({% for _,t,_ in f.args %} {{t}} {{ "," if not loop.last }} {% endfor %})>(&{% if f.namespace %}{{f.namespace}}::{% endif %}{{f.name}})
+    ({{f.return_type}} (*)({% for arg in f.args %} {{arg.arg_type}} {{ "," if not loop.last }} {% endfor %}))  static_cast<{{f.return_type}} (*)({% for arg in f.args %} {{arg.arg_type}} {{ "," if not loop.last }} {% endfor %})>(&{% if f.namespace %}{{f.namespace}}::{% endif %}{{f.name}})
 {%- endmacro -%}
 
 {%- macro template_args_typename(t) -%}
@@ -114,7 +114,7 @@
 {%- endmacro -%}
 
 {%- macro template_static_method_pointer(cls,f) -%}
-    ({{template_return_type(cls,f)}} (*)({% for _,t,d in f.args %} {{arg_type_with_template_params(cls, t)}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}) &{{cls.name}}{{template_args(cls)}}::{{f.name}}
+    ({{template_return_type(cls,f)}} (*)({% for arg in f.args %} {{arg_type_with_template_params(cls, arg.arg_type)}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}) &{{cls.name}}{{template_args(cls)}}::{{f.name}}
 {%- endmacro -%}
 
 {%- macro template_pointer(cls) -%}
