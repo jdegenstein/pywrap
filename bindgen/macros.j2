@@ -22,7 +22,7 @@
 
 {%- macro pybind_overload(c,m) -%}
     using return_type = {{m.return_type}};
-    PYBIND11_OVERLOAD_PURE(return_type,{{c.name}},{{m.name}},{% for n,t,d in m.args %}{{ n }}{{ "," if not loop.last }}{% endfor %})
+    PYBIND11_OVERLOAD_PURE(return_type,{{c.name}},{{m.name}},{% for arg in m.args %}{{ arg.arg_name }}{{ "," if not loop.last }}{% endfor %})
 {%- endmacro -%}
 
 {%- macro argtypes(f) -%}
@@ -60,8 +60,8 @@
 {%- macro argnames_template(template, f) -%}
     {%- for arg in f.args -%} {{ "," if loop.first }}
     {%- set ns = namespace(t=arg.arg_type) -%}
-    {%- if t.startswith(template.name) -%}
-        {% set ns.t = template.name + '<' +  template.type_params|map('get',1)|join(', ') + '>' + t.split(template.name)[-1] %}
+    {%- if arg.arg_type.startswith(template.name) -%}
+        {% set ns.t = template.name + '<' +  template.type_params|map('get',1)|join(', ') + '>' + arg.arg_type.split(template.name)[-1] %}
     {%- endif -%}
     py::arg("{{arg.arg_py_name if arg.arg_py_name != '' else 'arg'}}"){% if arg.arg_default %}=static_cast<{{arg_type_with_template_params(template, arg.arg_type)}}>({{arg.arg_default}}){% endif %}{{ ", " if not loop.last }}
     {%- endfor -%}
@@ -110,7 +110,7 @@
 {%- endmacro -%}
 
 {%- macro template_method_pointer(cls,f) -%}
-    ({{template_return_type(cls,f)}} ({{cls.name}}{{template_args(cls)}}::*)({% for _,t,d in f.args %} {{arg_type_with_template_params(cls, t)}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}) &{{cls.name}}{{template_args(cls)}}::{{f.name}}
+    ({{template_return_type(cls,f)}} ({{cls.name}}{{template_args(cls)}}::*)({% for _,t,d,_ in f.args %} {{arg_type_with_template_params(cls, t)}} {{ "," if not loop.last }} {% endfor %}) {{ "const" if f.const }}) &{{cls.name}}{{template_args(cls)}}::{{f.name}}
 {%- endmacro -%}
 
 {%- macro template_static_method_pointer(cls,f) -%}

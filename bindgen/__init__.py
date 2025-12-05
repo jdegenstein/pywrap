@@ -159,9 +159,9 @@ def is_byref(met, byref_types):
     rv = False
 
     if met.return_type == "void":
-        for _, arg, _ in met.args:
+        for arg in met.args:
             if any(
-                arg.startswith(byref_t) and arg.endswith("&") for byref_t in byref_types
+                arg.arg_type.startswith(byref_t) and arg.arg_type.endswith("&") for byref_t in byref_types
             ):
                 rv = True
                 break
@@ -535,7 +535,7 @@ def render(settings, module_settings, modules, class_dict, prefix=Path(""), plat
             "include_pre": pre,
             "include_post": post,
             "references_inner": lambda name, method: name + "::" in method.return_type
-            or any([name + "::" in a for _, a, _ in method.args]),
+            or any([name + "::" in arg.arg_type for arg in method.args]),
             "proper_new_operator": proper_new_operator,
             "proper_delete_operator": proper_delete_operator,
             "module_names": module_names,
