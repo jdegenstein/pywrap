@@ -111,6 +111,7 @@ py::object klass;
         .def("{{m.name}}",
              {{ method_pointer(c,m) }},
              R"#({{m.comment}})#" {{argnames(m)}}
+             {% if m.requires_rv_policy %}, py::return_value_policy::reference_internal{% endif %}
           )
     {% endif %}
     {% endfor %}
@@ -131,8 +132,9 @@ py::object klass;
     {% for m in c.static_methods %}
     {% if not m.pointer_by_ref %}
         .def_static("{{m.name}}_s",
-                    {{ static_method_pointer(c,m) }},
-                    R"#({{m.comment}})#" {{argnames(m)}}
+             {{ static_method_pointer(c,m) }},
+             R"#({{m.comment}})#" {{argnames(m)}}
+             {% if m.requires_rv_policy %}, py::return_value_policy::reference{% endif %}
           )
     {% endif %}
     {% endfor %}
@@ -186,22 +188,40 @@ py::object klass;
         .def_readwrite("{{f.name}}", &{{c.name}}::{{f.name}})
     {% endif %}
     {% endfor %}
+    // Pythonic iterators for OCCT 8.0 collections
+    {% if "Items" in c.methods_dict %}
+        .def("items", 
+             []( {{c.name}} &self ) {
+                 return py::make_iterator(self.Items().begin(), self.Items().end());
+             }, 
+             py::keep_alive<0, 1>(), // Keep map alive while iterator exists
+             R"#(Returns a python iterator over the map's key-value pairs.)#"
+        )
+    {% endif %}
+    {% if "IndexedItems" in c.methods_dict %}
+        .def("indexed_items", 
+             []( {{c.name}} &self ) {
+                 return py::make_iterator(self.IndexedItems().begin(), self.IndexedItems().end());
+             }, 
+             py::keep_alive<0, 1>(),
+             R"#(Returns a python iterator over the map's indexed key-value pairs.)#"
+        )
+    {% endif %}
     // methods returning by ref wrapped as properties
     {% for m in c.methods_return_byref %}
     {% if m.return_type.replace('&','').strip() in settings['byref_types'] %}
-       .def_property("{{m.name}}",
+        .def_property("{{m.name}}",
                      []({{c.name}}& self){return self.{{m.name}}();} {% if not  m.return_type.startswith('const') %},
                      []({{c.name}}& self, {{m.return_type.replace('&','')}} val){self.{{m.name}}() = val;}, {% endif %}
                      R"#({{m.comment}})#"
          )
     {% else %}
-       .def("{{m.name}}",
+        .def("{{m.name}}",
              {{ method_pointer(c,m) }},
              R"#({{m.comment}})#"
              {{argnames(m)}}
-             {% if (not is_byref_smart_ptr(m.return_type) and not m.return_type.strip().startswith('const'))
-                   or "TColgp_" in m.return_type or "TColStd_" in m.return_type %}
-             , py::return_value_policy::reference_internal
+             {% if m.requires_rv_policy %}
+              , py::return_value_policy::reference_internal
              {% endif %}
          )
     {% endif %}
