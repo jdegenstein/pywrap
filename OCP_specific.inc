@@ -2,6 +2,7 @@
 #include <Standard_Handle.hxx>
 #include <type_traits>
 #include <memory>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -21,7 +22,7 @@ void register_occ_exception(py::handle scope,
         try {
             std::rethrow_exception(p);
         } catch (const CppException &e) {
-            ex(e.GetMessageString());
+            ex(e.what()); 
         }
     });    
 };
