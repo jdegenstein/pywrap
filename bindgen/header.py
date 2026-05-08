@@ -560,13 +560,21 @@ class FunctionInfo(BaseInfo):
     }
 
     def __init__(self, cur: Cursor):
-
         super(FunctionInfo, self).__init__(cur)
-
+        
         self.comment = cur.brief_comment
         self.full_name = cur.displayname
         self.mangled_name = cur.mangled_name
         self.return_type = self._underlying_type(cur.result_type, cur)
+
+        # Detect if the return type is a reference or pointer to an internal C++ object
+        self.returns_reference = cur.result_type.kind == TypeKind.LVALUEREFERENCE
+        self.returns_pointer = cur.result_type.kind == TypeKind.POINTER
+        
+        # If it returns a standard smart pointer, Pybind11 handles ownership natively.
+        # We only need to guard raw pointers and l-value references.
+        self.requires_rv_policy = (self.returns_reference or self.returns_pointer) and not "shared_ptr" in self.return_type
+        # -----------------------------------------------------
 
         if cur.semantic_parent.kind == CursorKind.NAMESPACE:
             self.namespace = cur.semantic_parent.spelling
